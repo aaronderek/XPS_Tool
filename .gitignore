@@ -1,0 +1,32 @@
+# macOS
+.DS_Store
+
+# Local runtime artifacts
+.runtime/
+
+# Data and archival content (do not push)
+/Data/
+/Archive/
+
+# Root docs excluded from GitHub
+/AI_AGENT_XPS_PLAYBOOK.md
+/PROJECT_INDEX.md
+/changelog.md
+
+# Python cache/build artifacts
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+/XPS Tool/Main Program/.venv/
+/XPS Tool/XPS Plugin/.venv2/
+/XPS Tool/XPS Plugin/.venv311/
+
+# Keep embedded git backup local only
+/XPS Tool/Main Program/.git_embedded_backup/

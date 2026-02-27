@@ -1,0 +1,27 @@
+# 2DEG Visualization Tool - Dependencies
+
+# Core framework
+streamlit>=1.28.0
+
+# Numerical computing
+numpy>=1.24.0
+scipy>=1.11.0
+
+# Data handling
+pandas>=2.0.0
+
+# Visualization
+plotly>=5.17.0
+matplotlib>=3.7.0
+
+# Image export (for saving plots as PNG/SVG)
+kaleido>=0.2.1
+
+# Optional for direct .spe conversion inside XPS Spectrum tab
+# NOTE: For specific PHI .spe variants you may need a patched yadg build.
+# yadg>=6.2.2
+# xarray>=2023.0
+# h5py>=3.8
+
+# Optional: For better performance
+# numba>=0.57.0  # Uncomment if you want JIT compilation speedups
