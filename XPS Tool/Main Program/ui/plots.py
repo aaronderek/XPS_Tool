@@ -2,10 +2,97 @@
 Plotting functions for 2DEG visualization.
 """
 
+from __future__ import annotations
+
 import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from physics.units import ns_to_display
+
+CARBON_COLORS = {
+    "primary": "#0f62fe",
+    "secondary": "#24a148",
+    "tertiary": "#ff832b",
+    "quaternary": "#8a3ffc",
+    "danger": "#da1e28",
+    "teal": "#009d9a",
+    "text": "#161616",
+    "muted": "#525252",
+    "grid": "#dde1e6",
+    "surface": "#ffffff",
+}
+
+CARBON_COLORWAY = [
+    CARBON_COLORS["primary"],
+    CARBON_COLORS["secondary"],
+    CARBON_COLORS["tertiary"],
+    CARBON_COLORS["quaternary"],
+    CARBON_COLORS["teal"],
+]
+
+COLOR_ALIASES = {
+    "blue": CARBON_COLORS["primary"],
+    "green": CARBON_COLORS["secondary"],
+    "orange": CARBON_COLORS["tertiary"],
+    "purple": CARBON_COLORS["quaternary"],
+    "red": CARBON_COLORS["danger"],
+    "gray": CARBON_COLORS["muted"],
+}
+
+
+def _resolve_color(color: str | None, fallback: str) -> str:
+    if not color:
+        return fallback
+    return COLOR_ALIASES.get(str(color).lower(), str(color))
+
+
+def _apply_carbon_layout(
+    fig: go.Figure,
+    *,
+    title: str | None = None,
+    height: int | None = None,
+    width: int | None = None,
+    showlegend: bool = True,
+    legend: dict | None = None,
+) -> None:
+    layout_updates = {
+        "template": "plotly_white",
+        "paper_bgcolor": CARBON_COLORS["surface"],
+        "plot_bgcolor": CARBON_COLORS["surface"],
+        "font": dict(
+            size=12,
+            color=CARBON_COLORS["text"],
+            family="IBM Plex Sans, Segoe UI, Helvetica Neue, Arial, sans-serif",
+        ),
+        "hovermode": "closest",
+        "showlegend": showlegend,
+        "colorway": CARBON_COLORWAY,
+        "margin": dict(l=60, r=24, t=72, b=54),
+    }
+    if title is not None:
+        layout_updates["title"] = title
+    if height is not None:
+        layout_updates["height"] = height
+    if width is not None:
+        layout_updates["width"] = width
+    if legend is not None:
+        layout_updates["legend"] = legend
+
+    fig.update_layout(**layout_updates)
+    fig.update_xaxes(
+        showgrid=True,
+        gridwidth=1,
+        gridcolor=CARBON_COLORS["grid"],
+        linecolor=CARBON_COLORS["grid"],
+        zeroline=False,
+    )
+    fig.update_yaxes(
+        showgrid=True,
+        gridwidth=1,
+        gridcolor=CARBON_COLORS["grid"],
+        linecolor=CARBON_COLORS["grid"],
+        zeroline=False,
+    )
 
 
 def create_ns_vs_Phi_s_plot(curves_data, title="Sheet Density vs Surface Potential",
@@ -43,7 +130,7 @@ def create_ns_vs_Phi_s_plot(curves_data, title="Sheet Density vs Surface Potenti
         Phi_s = curve['Phi_s']
         ns = curve['ns']
         name = curve['name']
-        color = curve.get('color', None)
+        color = _resolve_color(curve.get('color'), CARBON_COLORWAY[i % len(CARBON_COLORWAY)])
 
         # Convert ns to display units (10¹³ cm⁻²)
         ns_display = ns_to_display(ns)
@@ -74,7 +161,7 @@ def create_ns_vs_Phi_s_plot(curves_data, title="Sheet Density vs Surface Potenti
                 x=np.concatenate([Phi_s, Phi_s[::-1]]),
                 y=np.concatenate([ns_low_display, ns_high_display[::-1]]),
                 fill='toself',
-                fillcolor='rgba(100, 150, 250, 0.2)',
+                fillcolor='rgba(15, 98, 254, 0.18)',
                 line=dict(width=0),
                 showlegend=True,
                 name=f'm* uncertainty ({m_star_range[0]:.2f}-{m_star_range[1]:.2f} m₀)',
@@ -86,20 +173,13 @@ def create_ns_vs_Phi_s_plot(curves_data, title="Sheet Density vs Surface Potenti
             y=ns_display,
             mode='lines',
             name=name,
-            line=dict(color=color, width=2),
+            line=dict(color=color, width=2.5),
             hovertemplate='Φₛ: %{x:.3f} eV<br>nₛ: %{y:.2f} × 10¹³ cm⁻²<extra></extra>'
         ))
 
     fig.update_layout(
-        title=title,
         xaxis_title="Surface Potential Φₛ (eV)",
         yaxis_title="Sheet Density nₛ (10¹³ cm⁻²)",
-        hovermode='closest',
-        template='plotly_white',
-        font=dict(size=12),
-        width=800,
-        height=500,
-        showlegend=True,
         legend=dict(
             yanchor="top",
             y=0.99,
@@ -107,9 +187,14 @@ def create_ns_vs_Phi_s_plot(curves_data, title="Sheet Density vs Surface Potenti
             x=0.01
         )
     )
-
-    fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor='LightGray')
-    fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor='LightGray')
+    _apply_carbon_layout(
+        fig,
+        title=title,
+        width=800,
+        height=500,
+        showlegend=True,
+        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
+    )
 
     return fig
 
@@ -151,7 +236,7 @@ def create_Delta_WF_vs_ns_plot(curves_data, title="Work Function Change vs Sheet
         Delta_WF = curve['Delta_WF']
         name = curve['name']
         with_ads = curve.get('with_adsorbate', False)
-        color = curve.get('color', None)
+        color = _resolve_color(curve.get('color'), CARBON_COLORWAY[i % len(CARBON_COLORWAY)])
 
         # Convert ns to display units
         ns_display = ns_to_display(ns)
@@ -187,7 +272,7 @@ def create_Delta_WF_vs_ns_plot(curves_data, title="Work Function Change vs Sheet
                 x=np.concatenate([ns_display, ns_display[::-1]]),
                 y=np.concatenate([Delta_WF_low, Delta_WF_high[::-1]]),
                 fill='toself',
-                fillcolor='rgba(100, 150, 250, 0.2)',
+                fillcolor='rgba(15, 98, 254, 0.18)',
                 line=dict(width=0),
                 showlegend=True,
                 name=f'm* uncertainty ({m_star_range[0]:.2f}-{m_star_range[1]:.2f} m₀)',
@@ -202,20 +287,13 @@ def create_Delta_WF_vs_ns_plot(curves_data, title="Work Function Change vs Sheet
             y=Delta_WF,
             mode='lines',
             name=name,
-            line=dict(color=color, width=2, dash=line_style),
+            line=dict(color=color, width=2.5, dash=line_style),
             hovertemplate='nₛ: %{x:.2f} × 10¹³ cm⁻²<br>ΔWF: %{y:.3f} eV<extra></extra>'
         ))
 
     fig.update_layout(
-        title=title,
         xaxis_title="Sheet Density nₛ (10¹³ cm⁻²)",
         yaxis_title="Work Function Change ΔWF (eV)",
-        hovermode='closest',
-        template='plotly_white',
-        font=dict(size=12),
-        width=800,
-        height=500,
-        showlegend=True,
         legend=dict(
             yanchor="top",
             y=0.99,
@@ -223,9 +301,14 @@ def create_Delta_WF_vs_ns_plot(curves_data, title="Work Function Change vs Sheet
             x=0.99
         )
     )
-
-    fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor='LightGray')
-    fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor='LightGray')
+    _apply_carbon_layout(
+        fig,
+        title=title,
+        width=800,
+        height=500,
+        showlegend=True,
+        legend=dict(yanchor="top", y=0.99, xanchor="right", x=0.99),
+    )
 
     return fig
 
@@ -251,13 +334,13 @@ def create_potential_profile_plot(z_nm, V_eV, title="Potential Profile"):
     fig = go.Figure()
 
     if isinstance(V_eV, dict):
-        for name, V in V_eV.items():
+        for idx, (name, V) in enumerate(V_eV.items()):
             fig.add_trace(go.Scatter(
                 x=z_nm,
                 y=V,
                 mode='lines',
                 name=name,
-                line=dict(width=2),
+                line=dict(width=2.5, color=CARBON_COLORWAY[idx % len(CARBON_COLORWAY)]),
                 hovertemplate='z: %{x:.2f} nm<br>V: %{y:.3f} eV<extra></extra>'
             ))
     else:
@@ -265,24 +348,16 @@ def create_potential_profile_plot(z_nm, V_eV, title="Potential Profile"):
             x=z_nm,
             y=V_eV,
             mode='lines',
-            line=dict(width=2, color='blue'),
+            line=dict(width=2.5, color=CARBON_COLORS["primary"]),
             hovertemplate='z: %{x:.2f} nm<br>V: %{y:.3f} eV<extra></extra>',
             showlegend=False
         ))
 
     fig.update_layout(
-        title=title,
         xaxis_title="Depth z (nm)",
         yaxis_title="Potential Energy V (eV)",
-        hovermode='closest',
-        template='plotly_white',
-        font=dict(size=12),
-        width=700,
-        height=400
     )
-
-    fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor='LightGray')
-    fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor='LightGray')
+    _apply_carbon_layout(fig, title=title, width=700, height=400, showlegend=isinstance(V_eV, dict))
 
     return fig
 
@@ -311,26 +386,18 @@ def create_electron_density_plot(z_nm, n_z, title="Electron Density Distribution
         x=z_nm,
         y=n_z,
         mode='lines',
-        line=dict(width=2, color='red'),
+        line=dict(width=2.5, color=CARBON_COLORS["danger"]),
         fill='tozeroy',
-        fillcolor='rgba(255, 0, 0, 0.1)',
+        fillcolor='rgba(218, 30, 40, 0.12)',
         hovertemplate='z: %{x:.2f} nm<br>n(z): %{y:.2e}<extra></extra>',
         showlegend=False
     ))
 
     fig.update_layout(
-        title=title,
         xaxis_title="Depth z (nm)",
         yaxis_title="Electron Density n(z) (a.u.)",
-        hovermode='closest',
-        template='plotly_white',
-        font=dict(size=12),
-        width=700,
-        height=400
     )
-
-    fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor='LightGray')
-    fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor='LightGray')
+    _apply_carbon_layout(fig, title=title, width=700, height=400, showlegend=False)
 
     return fig
 
@@ -359,26 +426,18 @@ def create_xps_weight_plot(z_nm, w_z, title="XPS Sampling Weight"):
         x=z_nm,
         y=w_z,
         mode='lines',
-        line=dict(width=2, color='green'),
+        line=dict(width=2.5, color=CARBON_COLORS["secondary"]),
         fill='tozeroy',
-        fillcolor='rgba(0, 255, 0, 0.1)',
+        fillcolor='rgba(36, 161, 72, 0.12)',
         hovertemplate='z: %{x:.2f} nm<br>w(z): %{y:.2e}<extra></extra>',
         showlegend=False
     ))
 
     fig.update_layout(
-        title=title,
         xaxis_title="Depth z (nm)",
         yaxis_title="XPS Weight w(z) (nm⁻¹)",
-        hovermode='closest',
-        template='plotly_white',
-        font=dict(size=12),
-        width=700,
-        height=400
     )
-
-    fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor='LightGray')
-    fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor='LightGray')
+    _apply_carbon_layout(fig, title=title, width=700, height=400, showlegend=False)
 
     return fig
 
@@ -416,7 +475,7 @@ def create_combined_profile_plot(z_nm, V_eV, n_z=None, w_z=None):
     # Plot V(z)
     fig.add_trace(
         go.Scatter(x=z_nm, y=V_eV, mode='lines',
-                  line=dict(color='blue', width=2), name='V(z)'),
+                  line=dict(color=CARBON_COLORS["primary"], width=2.3), name='V(z)'),
         row=1, col=1
     )
 
@@ -424,8 +483,8 @@ def create_combined_profile_plot(z_nm, V_eV, n_z=None, w_z=None):
     if n_z is not None:
         fig.add_trace(
             go.Scatter(x=z_nm, y=n_z, mode='lines',
-                      line=dict(color='red', width=2), name='n(z)',
-                      fill='tozeroy', fillcolor='rgba(255, 0, 0, 0.1)'),
+                      line=dict(color=CARBON_COLORS["danger"], width=2.2), name='n(z)',
+                      fill='tozeroy', fillcolor='rgba(218, 30, 40, 0.12)'),
             row=row, col=1
         )
         row += 1
@@ -433,8 +492,8 @@ def create_combined_profile_plot(z_nm, V_eV, n_z=None, w_z=None):
     if w_z is not None:
         fig.add_trace(
             go.Scatter(x=z_nm, y=w_z, mode='lines',
-                      line=dict(color='green', width=2), name='w(z)',
-                      fill='tozeroy', fillcolor='rgba(0, 255, 0, 0.1)'),
+                      line=dict(color=CARBON_COLORS["secondary"], width=2.2), name='w(z)',
+                      fill='tozeroy', fillcolor='rgba(36, 161, 72, 0.12)'),
             row=row, col=1
         )
 
@@ -447,11 +506,11 @@ def create_combined_profile_plot(z_nm, V_eV, n_z=None, w_z=None):
     if w_z is not None:
         fig.update_yaxes(title_text="w(z) (nm⁻¹)", row=n_plots, col=1)
 
-    fig.update_layout(
+    _apply_carbon_layout(
+        fig,
         height=300 * n_plots,
         width=700,
-        template='plotly_white',
-        showlegend=False
+        showlegend=False,
     )
 
     return fig
@@ -599,7 +658,7 @@ def create_comparison_CL_vs_WF_plot(
             y=Delta_CL_theory,
             mode='lines',
             name='Theory',
-            line=dict(color='blue', width=3),
+            line=dict(color=CARBON_COLORS["primary"], width=3),
             hovertemplate='ΔWF: %{x:.3f} eV<br>ΔE_CL: %{y:.3f} eV (theory)<extra></extra>'
         ))
 
@@ -610,8 +669,12 @@ def create_comparison_CL_vs_WF_plot(
             y=exp_data['Delta_CL'],
             mode='markers',
             name='Experiment',
-            marker=dict(size=12, color='red', symbol='circle',
-                       line=dict(width=1.5, color='black')),
+            marker=dict(
+                size=11,
+                color=CARBON_COLORS["danger"],
+                symbol='circle',
+                line=dict(width=1.1, color=CARBON_COLORS["text"]),
+            ),
             hovertemplate='ΔWF: %{x:.3f} eV<br>ΔE_CL: %{y:.3f} eV (exp)<extra></extra>'
         ))
 
@@ -633,7 +696,7 @@ def create_comparison_CL_vs_WF_plot(
                 y=y_fit,
                 mode='lines',
                 name=f'Exp. fit (η={slope:.3f})',
-                line=dict(color='red', width=2, dash='dash'),
+                line=dict(color=CARBON_COLORS["danger"], width=2.3, dash='dash'),
                 hovertemplate=f'Linear fit<br>η={slope:.3f}<br>R²={r_value**2:.4f}<extra></extra>'
             ))
 
@@ -648,10 +711,10 @@ def create_comparison_CL_vs_WF_plot(
                 x=0.98, y=0.98,  # Top-right corner
                 xanchor='right', yanchor='top',  # Right-aligned
                 showarrow=False,
-                font=dict(size=11),
+                font=dict(size=11, color=CARBON_COLORS["text"]),
                 bgcolor="rgba(255,255,255,0.95)",  # Slightly more opaque
-                bordercolor="black",
-                borderwidth=1.5,
+                bordercolor=CARBON_COLORS["grid"],
+                borderwidth=1.2,
                 borderpad=8
             )
 
@@ -662,7 +725,7 @@ def create_comparison_CL_vs_WF_plot(
             y=theory_data['Delta_CL'],
             mode='lines',
             name='Theory',
-            line=dict(color='blue', width=3),
+            line=dict(color=CARBON_COLORS["primary"], width=3),
             hovertemplate='ΔWF: %{x:.3f} eV<br>ΔE_CL: %{y:.3f} eV<extra></extra>'
         ))
 
@@ -675,20 +738,13 @@ def create_comparison_CL_vs_WF_plot(
             y=fit_result['theory_Delta_CL'][sort_idx],
             mode='lines',
             name=f"Fit (η={fit_result['eta_fit']:.3f}, R²={fit_result['r_squared']:.3f})",
-            line=dict(color='green', width=3, dash='dash'),
+            line=dict(color=CARBON_COLORS["secondary"], width=3, dash='dash'),
             hovertemplate='ΔWF: %{x:.3f} eV<br>ΔE_CL (fit): %{y:.3f} eV<extra></extra>'
         ))
 
     fig.update_layout(
-        title=title,
         xaxis_title="Work Function Change ΔWF (eV)",
         yaxis_title="Core Level Shift ΔE_CL (eV)",
-        hovermode='closest',
-        template='plotly_white',
-        font=dict(size=12),
-        width=800,
-        height=600,
-        showlegend=True,
         legend=dict(
             yanchor="top",
             y=0.99,
@@ -696,9 +752,14 @@ def create_comparison_CL_vs_WF_plot(
             x=0.01
         )
     )
-
-    fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor='LightGray')
-    fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor='LightGray')
+    _apply_carbon_layout(
+        fig,
+        title=title,
+        width=800,
+        height=600,
+        showlegend=True,
+        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
+    )
 
     return fig
 
@@ -742,20 +803,20 @@ def create_residual_analysis_plot(exp_data, fit_result):
             x=exp_data['Delta_WF'],
             y=residuals,
             mode='markers',
-            marker=dict(size=10, color='blue'),
+            marker=dict(size=9, color=CARBON_COLORS["primary"]),
             name='Residuals',
             showlegend=False
         ),
         row=1, col=1
     )
-    fig.add_hline(y=0, line_dash="dash", line_color="red", row=1, col=1)
+    fig.add_hline(y=0, line_dash="dash", line_color=CARBON_COLORS["danger"], row=1, col=1)
 
     # 2. Histogram
     fig.add_trace(
         go.Histogram(
             x=residuals,
             nbinsx=15,
-            marker=dict(color='lightblue', line=dict(color='black', width=1)),
+            marker=dict(color='rgba(15, 98, 254, 0.28)', line=dict(color=CARBON_COLORS["grid"], width=1)),
             name='Distribution',
             showlegend=False
         ),
@@ -769,7 +830,7 @@ def create_residual_analysis_plot(exp_data, fit_result):
             x=exp_data['Delta_CL'],
             y=predicted,
             mode='markers',
-            marker=dict(size=10, color='green'),
+            marker=dict(size=9, color=CARBON_COLORS["secondary"]),
             name='Data',
             showlegend=False
         ),
@@ -783,7 +844,7 @@ def create_residual_analysis_plot(exp_data, fit_result):
             x=[min_val, max_val],
             y=[min_val, max_val],
             mode='lines',
-            line=dict(color='red', dash='dash'),
+            line=dict(color=CARBON_COLORS["danger"], dash='dash'),
             name='Perfect fit',
             showlegend=False
         ),
@@ -798,7 +859,7 @@ def create_residual_analysis_plot(exp_data, fit_result):
     fig.add_trace(
         go.Table(
             header=dict(values=['Statistic', 'Value'],
-                       fill_color='lightgray',
+                       fill_color='#eef4ff',
                        align='left'),
             cells=dict(values=[
                 ['Mean residual', 'Std residual', 'Max |residual|', 'RMSE', 'R²'],
@@ -821,11 +882,7 @@ def create_residual_analysis_plot(exp_data, fit_result):
     fig.update_xaxes(title_text="Actual ΔE_CL (eV)", row=2, col=1)
     fig.update_yaxes(title_text="Predicted ΔE_CL (eV)", row=2, col=1)
 
-    fig.update_layout(
-        height=800,
-        showlegend=False,
-        template='plotly_white'
-    )
+    _apply_carbon_layout(fig, height=800, showlegend=False)
 
     return fig
 
@@ -860,8 +917,8 @@ def create_annealing_trajectory_plot(exp_data, title="Annealing Trajectory"):
             x=exp_data['T_degC'],
             y=exp_data['Delta_WF'],
             mode='lines+markers',
-            marker=dict(size=10, color='red'),
-            line=dict(color='red', width=2),
+            marker=dict(size=9, color=CARBON_COLORS["danger"]),
+            line=dict(color=CARBON_COLORS["danger"], width=2.4),
             name='ΔWF',
             hovertemplate='T: %{x}°C<br>ΔWF: %{y:.3f} eV<extra></extra>'
         ),
@@ -874,8 +931,8 @@ def create_annealing_trajectory_plot(exp_data, title="Annealing Trajectory"):
             x=exp_data['T_degC'],
             y=exp_data['Delta_CL'],
             mode='lines+markers',
-            marker=dict(size=10, color='blue'),
-            line=dict(color='blue', width=2),
+            marker=dict(size=9, color=CARBON_COLORS["primary"]),
+            line=dict(color=CARBON_COLORS["primary"], width=2.4),
             name='ΔE_CL',
             hovertemplate='T: %{x}°C<br>ΔE_CL: %{y:.3f} eV<extra></extra>'
         ),
@@ -889,11 +946,6 @@ def create_annealing_trajectory_plot(exp_data, title="Annealing Trajectory"):
     fig.update_xaxes(title_text="Temperature (°C)", row=1, col=2)
     fig.update_yaxes(title_text="ΔE_CL (eV)", row=1, col=2)
 
-    fig.update_layout(
-        title=title,
-        height=400,
-        showlegend=False,
-        template='plotly_white'
-    )
+    _apply_carbon_layout(fig, title=title, height=400, showlegend=False)
 
     return fig

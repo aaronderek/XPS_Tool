@@ -13,6 +13,7 @@ import io
 import os
 import hashlib
 import matplotlib.pyplot as plt
+from carbon_theme import inject_carbon_css
 
 # Import models
 from models import TriangularModel, FangHowardModel, ParabolicModel
@@ -63,9 +64,11 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Title
-st.title("2DEG Surface Electron Gas Visualization Tool")
-st.markdown("**Interactive tool for exploring 2DEG physics and XPS measurements**")
+inject_carbon_css()
+
+CARBON_PRIMARY_COLOR = "#0f62fe"
+CARBON_COMPARISON_COLORS = ["#0f62fe", "#24a148", "#ff832b", "#8a3ffc"]
+CARBON_NEUTRAL_COLOR = "#6f6f6f"
 
 # Initialize session state for comparison curves
 if 'comparison_curves' not in st.session_state:
@@ -86,6 +89,16 @@ if 'xps_batch_fit_result' not in st.session_state:
     st.session_state.xps_batch_fit_result = None
 
 # Sidebar - Parameter Controls
+st.sidebar.markdown(
+    """
+    <div class="carbon-sidebar-brand">
+        <p class="carbon-sidebar-kicker">XPS Tool</p>
+        <h2>2DEG Physics Console</h2>
+        <p>Carbon redesign with publication-focused scientific workflows.</p>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
 st.sidebar.header("Parameters")
 
 # Model selection
@@ -269,7 +282,7 @@ curves_fig1 = [{
     'name': f"{model_type}, W={W_nm:.1f}nm",
     'Phi_s': Phi_s_range,
     'ns': ns_array,
-    'color': 'blue'
+    'color': CARBON_PRIMARY_COLOR
 }]
 
 # Generate curve data for Figure 2: Delta_WF vs ns
@@ -286,7 +299,7 @@ curves_fig2 = [{
     'ns': ns_range,
     'Delta_WF': Delta_WF_array,
     'with_adsorbate': False,
-    'color': 'blue'
+    'color': CARBON_PRIMARY_COLOR
 }]
 
 # With adsorbates
@@ -307,7 +320,7 @@ for comp_curve in st.session_state.comparison_curves:
         'name': comp_curve['name'],
         'Phi_s': comp_curve['Phi_s_range'],
         'ns': comp_curve['ns_array'],
-        'color': comp_curve.get('color', 'gray')
+        'color': comp_curve.get('color', CARBON_NEUTRAL_COLOR)
     })
 
     # For Figure 2
@@ -316,7 +329,7 @@ for comp_curve in st.session_state.comparison_curves:
         'ns': comp_curve['ns_range'],
         'Delta_WF': comp_curve['Delta_WF_array'],
         'with_adsorbate': False,
-        'color': comp_curve.get('color', 'gray')
+        'color': comp_curve.get('color', CARBON_NEUTRAL_COLOR)
     })
 
     if comp_curve.get('with_adsorbates', False):
@@ -325,18 +338,55 @@ for comp_curve in st.session_state.comparison_curves:
             'ns': comp_curve['ns_range'],
             'Delta_WF': comp_curve['Delta_WF_with_ads'],
             'with_adsorbate': True,
-            'color': comp_curve.get('color', 'gray')
+            'color': comp_curve.get('color', CARBON_NEUTRAL_COLOR)
         })
+
+# Top-level summary strip
+current_ns = model.calculate_ns(Phi_s)
+current_Delta_WF = model.calculate_Delta_WF(current_ns)
+current_Delta_WF_total = current_Delta_WF + Delta_Phi_dip if show_adsorbates else current_Delta_WF
+Delta_E_CL = None
+eta = None
+if model_type != "M2-Fang-Howard":
+    Delta_E_CL, eta = xps_model.calculate_shift(model, Phi_s)
+
+st.markdown(
+    f"""
+    <section class="carbon-hero">
+        <p class="carbon-hero-kicker">IBM Carbon Redesign</p>
+        <h1>2DEG Surface Electron Gas Visualization Tool</h1>
+        <p>Explore band bending, XPS observables, and experiment fitting in a modern enterprise-style workspace.</p>
+        <div class="carbon-hero-meta">
+            <span>Model: {model_type}</span>
+            <span>Adsorbates: {"Enabled" if show_adsorbates else "Disabled"}</span>
+            <span>Emission angle: {theta_xps}°</span>
+        </div>
+    </section>
+    """,
+    unsafe_allow_html=True
+)
+
+kpi_col1, kpi_col2, kpi_col3, kpi_col4, kpi_col5 = st.columns(5)
+with kpi_col1:
+    st.metric("nₛ (10¹³ cm⁻²)", f"{ns_to_display(current_ns):.3f}")
+with kpi_col2:
+    st.metric("ΔWF (eV)", f"{current_Delta_WF_total:.3f}")
+with kpi_col3:
+    st.metric("Φₛ (eV)", f"{Phi_s:.3f}")
+with kpi_col4:
+    st.metric("η", f"{eta:.2f}" if eta is not None else "Adaptive")
+with kpi_col5:
+    st.metric("Compare Curves", len(st.session_state.comparison_curves))
 
 # Main area - Create tabs
 tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
-    "📊 Core Figures",
-    "📈 Additional Plots",
-    "🔬 Experiment Comparison",
-    "📤 Publication Export",
-    "🧪 Beta Features",
-    "🧲 XPS Spectrum",
-    "ℹ️ About"
+    "Core Figures",
+    "Additional Plots",
+    "Experiment Comparison",
+    "Publication Export",
+    "Beta Features",
+    "XPS Spectrum",
+    "About"
 ])
 
 # ============================================================================
@@ -461,7 +511,6 @@ with tab1:
         st.plotly_chart(fig1, use_container_width=True)
 
         # Display current value
-        current_ns = model.calculate_ns(Phi_s)
         st.info(f"**Current:** Φₛ = {Phi_s:.3f} eV → nₛ = {ns_to_display(current_ns):.3f} × 10¹³ cm⁻²")
 
     with col2:
@@ -483,10 +532,7 @@ with tab1:
         st.plotly_chart(fig2, use_container_width=True)
 
         # Display current value
-        current_ns = model.calculate_ns(Phi_s)
-        current_Delta_WF = model.calculate_Delta_WF(current_ns)
         if show_adsorbates:
-            current_Delta_WF_total = current_Delta_WF + Delta_Phi_dip
             st.info(f"**Current:** nₛ = {ns_to_display(current_ns):.3f} × 10¹³ cm⁻² → ΔWF = {current_Delta_WF:.3f} eV (no ads) / {current_Delta_WF_total:.3f} eV (with ads)")
         else:
             st.info(f"**Current:** nₛ = {ns_to_display(current_ns):.3f} × 10¹³ cm⁻² → ΔWF = {current_Delta_WF:.3f} eV")
@@ -497,8 +543,7 @@ with tab1:
         st.success(f"**Slope of ΔWF vs nₛ:** {slope:.3f} eV/(10¹³ cm⁻²)")
 
     # XPS core level shift
-    if model_type != "M2-Fang-Howard":  # Simpler calculation for M1 and M3
-        Delta_E_CL, eta = xps_model.calculate_shift(model, Phi_s)
+    if Delta_E_CL is not None and eta is not None:
         st.success(f"**XPS Core Level Shift:** ΔE_CL = {Delta_E_CL:.3f} eV (η = {eta:.2f})")
 
 # ============================================================================
@@ -2007,7 +2052,7 @@ with tab7:
 
 if add_comparison:
     # Generate comparison curve data
-    colors = ['red', 'green', 'orange', 'purple']
+    colors = CARBON_COMPARISON_COLORS
     color_idx = len(st.session_state.comparison_curves) % len(colors)
 
     comparison_data = {

@@ -60,6 +60,16 @@ ELEMENT_REFERENCE_PEAKS = [
     {"label": "Ga 3d", "energy_eV": 20.1},
 ]
 
+XPS_CARBON = {
+    "primary": "#0f62fe",
+    "secondary": "#24a148",
+    "danger": "#da1e28",
+    "warning": "#ff832b",
+    "text": "#161616",
+    "muted": "#6f6f6f",
+    "grid": "#dde1e6",
+}
+
 
 def _find_best_column(columns: Sequence[str], candidates: Sequence[str]) -> str | None:
     normalized_to_original = {c.strip().lower(): c for c in columns}
@@ -942,7 +952,7 @@ def create_xps_spectrum_figure(
             x=energy,
             y=intensity,
             mode="lines",
-            line=dict(color="#1f2a44", width=1.6 * width_scale),
+            line=dict(color=XPS_CARBON["text"], width=1.6 * width_scale),
             name="Raw spectrum",
             hovertemplate="E: %{x:.3f} eV<br>I: %{y:.3f}<extra></extra>",
         )
@@ -960,7 +970,7 @@ def create_xps_spectrum_figure(
                 x=peak_x,
                 y=peak_y,
                 mode="markers",
-                marker=dict(color="#d94801", size=max(6.0, 9.0 * width_scale), symbol="x"),
+                marker=dict(color=XPS_CARBON["warning"], size=max(6.0, 9.0 * width_scale), symbol="x"),
                 name="Detected peaks",
                 hovertemplate="Detected peak<br>E: %{x:.3f} eV<extra></extra>",
             )
@@ -974,7 +984,7 @@ def create_xps_spectrum_figure(
                     x=x_fit,
                     y=fit_result["baseline_y"],
                     mode="lines",
-                    line=dict(color="#7f7f7f", width=1.2 * width_scale, dash="dot"),
+                    line=dict(color=XPS_CARBON["muted"], width=1.2 * width_scale, dash="dot"),
                     name="Baseline",
                     hovertemplate="Baseline<br>E: %{x:.3f} eV<br>I: %{y:.3f}<extra></extra>",
                 )
@@ -984,7 +994,7 @@ def create_xps_spectrum_figure(
                 x=x_fit,
                 y=fit_result["fit_y"],
                 mode="lines",
-                line=dict(color="#006d2c", width=2.1 * width_scale),
+                line=dict(color=XPS_CARBON["secondary"], width=2.1 * width_scale),
                 name=f"Fit ({fit_result['profile']})",
                 hovertemplate="Fit<br>E: %{x:.3f} eV<br>I: %{y:.3f}<extra></extra>",
             )
@@ -1023,10 +1033,10 @@ def create_xps_spectrum_figure(
                     arrowhead=2,
                     arrowsize=1,
                     arrowwidth=1,
-                    arrowcolor="rgba(60,60,60,0.7)",
-                    font=dict(size=max(11, int(base_font_size * 0.85)), color="#202020"),
+                    arrowcolor="rgba(82,82,82,0.7)",
+                    font=dict(size=max(11, int(base_font_size * 0.85)), color=XPS_CARBON["text"]),
                     bgcolor="rgba(255,255,255,0.72)",
-                    bordercolor="rgba(120,120,120,0.45)",
+                    bordercolor="rgba(141,141,141,0.45)",
                     borderwidth=1,
                 )
 
@@ -1042,7 +1052,7 @@ def create_xps_spectrum_figure(
                 x=x_ref,
                 line_width=max(0.8, 1.0 * width_scale),
                 line_dash="dot",
-                line_color="rgba(217, 95, 2, 0.55)",
+                line_color="rgba(255, 131, 43, 0.65)",
             )
             if show_reference_labels and ref_count < 12:
                 fig.add_annotation(
@@ -1051,7 +1061,7 @@ def create_xps_spectrum_figure(
                     text=str(item.get("label", "")),
                     showarrow=False,
                     textangle=-90,
-                    font=dict(size=max(10, int(base_font_size * 0.9)), color="#7f2704"),
+                    font=dict(size=max(10, int(base_font_size * 0.9)), color="#8a3800"),
                     yanchor="top",
                 )
             ref_count += 1
@@ -1059,10 +1069,17 @@ def create_xps_spectrum_figure(
     fig.update_layout(
         title=dict(text=title, font=dict(size=title_font_size)),
         template="plotly_white",
+        paper_bgcolor="#ffffff",
+        plot_bgcolor="#ffffff",
         hovermode="closest",
         xaxis_title="Binding Energy (eV)",
         yaxis_title="Intensity (a.u.)",
-        font=dict(size=base_font_size),
+        font=dict(
+            size=base_font_size,
+            color=XPS_CARBON["text"],
+            family="IBM Plex Sans, Segoe UI, Helvetica Neue, Arial, sans-serif",
+        ),
+        colorway=[XPS_CARBON["primary"], XPS_CARBON["secondary"], XPS_CARBON["warning"], "#8a3ffc"],
         hoverlabel=dict(font=dict(size=max(11, base_font_size - 1))),
         height=int(figure_height),
         margin=dict(l=90, r=30, t=100, b=90),
@@ -1080,17 +1097,21 @@ def create_xps_spectrum_figure(
     fig.update_xaxes(
         autorange="reversed",
         showgrid=True,
-        gridcolor="LightGray",
+        gridcolor=XPS_CARBON["grid"],
         title_font=dict(size=max(12, base_font_size + 4)),
         tickfont=dict(size=max(10, base_font_size)),
         automargin=True,
+        linecolor=XPS_CARBON["grid"],
+        zeroline=False,
     )
     fig.update_yaxes(
         showgrid=True,
-        gridcolor="LightGray",
+        gridcolor=XPS_CARBON["grid"],
         title_font=dict(size=max(12, base_font_size + 4)),
         tickfont=dict(size=max(10, base_font_size)),
         automargin=True,
+        linecolor=XPS_CARBON["grid"],
+        zeroline=False,
     )
 
     if focus_range is not None and len(focus_range) == 2:
