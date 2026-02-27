@@ -174,7 +174,6 @@ p {
 
 [data-testid="stTabs"] [role="tab"] {
   border: 0;
-  border-bottom: 3px solid transparent;
   border-radius: 0;
   color: var(--cds-text-secondary);
   font-size: 0.86rem;
@@ -185,7 +184,7 @@ p {
 
 [data-testid="stTabs"] [role="tab"][aria-selected="true"] {
   color: var(--cds-text-primary);
-  border-bottom-color: var(--cds-interactive);
+  font-weight: 600;
 }
 
 [data-testid="stTabs"] [role="tab"]:hover {
@@ -193,19 +192,49 @@ p {
   background: rgba(15, 98, 254, 0.06);
 }
 
+[data-testid="stTabs"] [data-baseweb="tab-highlight"] {
+  background: var(--cds-interactive) !important;
+  height: 3px !important;
+}
+
 [data-testid="stPlotlyChart"],
 [data-testid="stDataFrame"],
 [data-testid="stTable"],
 [data-testid="stForm"],
-[data-testid="stExpander"],
 [data-testid="stFileUploader"] {
   background: var(--cds-layer-01);
   border: 1px solid var(--cds-border-subtle);
   box-shadow: var(--cds-shadow-flat);
+  border-radius: 0 !important;
+}
+
+[data-testid="stExpander"] {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  border-radius: 0 !important;
+}
+
+[data-testid="stExpander"] details {
+  background: var(--cds-layer-01);
+  border: 1px solid var(--cds-border-subtle);
+  box-shadow: none;
+  border-radius: 0 !important;
 }
 
 [data-testid="stExpander"] summary {
-  background: #fdfdfd;
+  background: var(--cds-layer-02);
+  border-radius: 0 !important;
+}
+
+[data-testid="stExpander"] details[open] summary {
+  border-bottom: 1px solid var(--cds-border-subtle);
+}
+
+[data-testid="stVerticalBlockBorderWrapper"],
+[data-testid="stVerticalBlockBorderWrapper"] > div,
+[data-testid="stFileUploaderDropzone"] {
+  border-radius: 0 !important;
 }
 
 [data-baseweb="select"] > div,
@@ -217,7 +246,27 @@ p {
 }
 
 [data-baseweb="slider"] [role="slider"] {
+  border-color: var(--cds-interactive) !important;
+  background: var(--cds-layer-01) !important;
   border-radius: 0 !important;
+}
+
+[data-testid="stSlider"] [data-testid="stTickBarMin"] {
+  background: var(--cds-interactive) !important;
+}
+
+[data-testid="stSlider"] [data-testid="stTickBarMax"] {
+  background: var(--cds-border-subtle) !important;
+}
+
+[data-testid="stSlider"] [data-testid="stThumbValue"],
+[data-testid="stSlider"] [data-testid="stThumbValue"] p {
+  color: var(--cds-interactive) !important;
+}
+
+[data-testid="stCheckbox"] input,
+[data-testid="stRadio"] input {
+  accent-color: var(--cds-interactive);
 }
 
 button[kind="primary"],

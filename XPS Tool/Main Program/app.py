@@ -94,7 +94,6 @@ st.sidebar.markdown(
     <div class="carbon-sidebar-brand">
         <p class="carbon-sidebar-kicker">XPS Tool</p>
         <h2>2DEG Physics Console</h2>
-        <p>Carbon redesign with publication-focused scientific workflows.</p>
     </div>
     """,
     unsafe_allow_html=True
@@ -310,7 +309,7 @@ if show_adsorbates:
         'ns': ns_range,
         'Delta_WF': Delta_WF_with_ads,
         'with_adsorbate': True,
-        'color': 'blue'
+        'color': CARBON_PRIMARY_COLOR
     })
 
 # Add comparison curves if any
@@ -353,9 +352,7 @@ if model_type != "M2-Fang-Howard":
 st.markdown(
     f"""
     <section class="carbon-hero">
-        <p class="carbon-hero-kicker">IBM Carbon Redesign</p>
         <h1>2DEG Surface Electron Gas Visualization Tool</h1>
-        <p>Explore band bending, XPS observables, and experiment fitting in a modern enterprise-style workspace.</p>
         <div class="carbon-hero-meta">
             <span>Model: {model_type}</span>
             <span>Adsorbates: {"Enabled" if show_adsorbates else "Disabled"}</span>
@@ -365,18 +362,6 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
-
-kpi_col1, kpi_col2, kpi_col3, kpi_col4, kpi_col5 = st.columns(5)
-with kpi_col1:
-    st.metric("nₛ (10¹³ cm⁻²)", f"{ns_to_display(current_ns):.3f}")
-with kpi_col2:
-    st.metric("ΔWF (eV)", f"{current_Delta_WF_total:.3f}")
-with kpi_col3:
-    st.metric("Φₛ (eV)", f"{Phi_s:.3f}")
-with kpi_col4:
-    st.metric("η", f"{eta:.2f}" if eta is not None else "Adaptive")
-with kpi_col5:
-    st.metric("Compare Curves", len(st.session_state.comparison_curves))
 
 # Main area - Create tabs
 tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
@@ -1355,7 +1340,7 @@ with tab6:
     with left_panel:
         with st.expander(xps_t("workflow_title"), expanded=False):
             st.markdown(xps_t("workflow_body"))
-        with st.container(border=True):
+        with st.container():
             st.subheader("Step 1: Data Import 📁")
             
             with st.expander("🛠️ Developer / AI Agent Auto-Loader", expanded=False):
@@ -1461,7 +1446,7 @@ with tab6:
                 )
 
             with left_panel:
-                with st.container(border=True):
+                with st.container():
                     st.subheader("Step 2: Region & Elements 🔍")
                     reference_library = get_element_reference_library()
                     ref_options = [item['label'] for item in reference_library]
@@ -1565,7 +1550,7 @@ with tab6:
             scope_slug = stable_token(selected_element_label or scope_id, max_len=32)
 
             with left_panel:
-                with st.container(border=True):
+                with st.container():
                     st.subheader("Step 3: Background & Fitting ⚙️")
                     sl1, sl2 = st.columns(2)
                     with sl1:
@@ -1776,7 +1761,7 @@ with tab6:
                     st.dataframe(peak_table, use_container_width=True)
 
             with left_panel:
-                with st.container(border=True):
+                with st.container():
                     st.subheader("Step 4: Export & Downloads 📥")
                     if current_xps_fit is not None:
                         peak_csv = peak_table.to_csv(index=False).encode('utf-8')
