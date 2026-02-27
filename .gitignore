@@ -11,7 +11,6 @@
 # Root docs excluded from GitHub
 /AI_AGENT_XPS_PLAYBOOK.md
 /PROJECT_INDEX.md
-/changelog.md
 
 # Python cache/build artifacts
 __pycache__/
