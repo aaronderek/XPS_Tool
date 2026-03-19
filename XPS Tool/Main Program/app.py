@@ -54,6 +54,15 @@ from utils.xps_spectrum import (
     match_fitted_peaks,
     build_spectra_zip_bytes
 )
+from utils.ups_spectrum import (
+    load_uploaded_ups_file,
+    detect_secondary_cutoff,
+    detect_valence_band_edge,
+    calculate_work_function,
+    create_ups_spectrum_figure,
+    export_ups_figure_bytes,
+    PHOTON_SOURCES,
+)
 
 # Page configuration
 st.set_page_config(
@@ -84,6 +93,12 @@ if 'xps_batch_fit_file' not in st.session_state:
     st.session_state.xps_batch_fit_file = ""
 if 'xps_batch_fit_result' not in st.session_state:
     st.session_state.xps_batch_fit_result = None
+if 'ups_wf_result' not in st.session_state:
+    st.session_state.ups_wf_result = None
+if 'ups_cutoff_result' not in st.session_state:
+    st.session_state.ups_cutoff_result = None
+if 'ups_vbm_result' not in st.session_state:
+    st.session_state.ups_vbm_result = None
 
 # Sidebar - Parameter Controls
 st.sidebar.header("Parameters")
@@ -329,13 +344,14 @@ for comp_curve in st.session_state.comparison_curves:
         })
 
 # Main area - Create tabs
-tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
     "📊 Core Figures",
     "📈 Additional Plots",
     "🔬 Experiment Comparison",
     "📤 Publication Export",
     "🧪 Beta Features",
     "🧲 XPS Spectrum",
+    "🔮 UPS Spectrum",
     "ℹ️ About"
 ])
 
@@ -1880,8 +1896,440 @@ with tab6:
                             st.download_button("⬇️ Download Batch Fit Summary", data=batch_csv, file_name=f"{filename.rsplit('.', 1)[0]}_batch_peak_fit.csv", mime="text/csv", use_container_width=True, key='xps_download_batch_fit')
 
 # ============================================================================
+# TAB 7: UPS SPECTRUM
+# ============================================================================
 
 with tab7:
+
+    UPS_UI_LANGUAGE = "en"
+
+    UPS_TEXT = {
+        "intro": {
+            "en": (
+                "Upload a UPS spectrum (CSV) to determine the **work function** via the "
+                "secondary electron cutoff (SEC) and valence band edge analysis."
+            ),
+            "zh": (
+                "上传UPS光谱（CSV）文件，通过二次电子截止（SEC）和价带边缘分析确定**功函数**。"
+            ),
+        },
+        "upload_required": {
+            "en": "⬆️ Upload a UPS spectrum CSV to begin analysis.",
+            "zh": "⬆️ 请上传UPS光谱CSV文件以开始分析。",
+        },
+        "upload_help": {
+            "en": "CSV with energy (binding or kinetic) and intensity columns.",
+            "zh": "包含能量（结合能或动能）和强度列的CSV文件。",
+        },
+        "workflow_title": {
+            "en": "📋 UPS Analysis Workflow",
+            "zh": "📋 UPS分析工作流程",
+        },
+        "workflow_body": {
+            "en": (
+                "1. **Upload** a UPS spectrum CSV file\n"
+                "2. **Select** photon source and energy scale\n"
+                "3. **Adjust** SEC cutoff and VBM edge regions\n"
+                "4. **Run** work function calculation\n"
+                "5. **Export** results and figures"
+            ),
+            "zh": (
+                "1. **上传** UPS光谱CSV文件\n"
+                "2. **选择** 光子源和能量标度\n"
+                "3. **调整** SEC截止和VBM边缘区域\n"
+                "4. **运行** 功函数计算\n"
+                "5. **导出** 结果和图形"
+            ),
+        },
+    }
+
+    def ups_t(key: str) -> str:
+        entry = UPS_TEXT.get(key, {})
+        return str(entry.get(UPS_UI_LANGUAGE) or entry.get("en") or key)
+
+    st.header("🔮 UPS Spectrum Analyzer")
+    st.markdown(ups_t("intro"))
+
+    col_left, col_right = st.columns([1.2, 2.0], gap="large")
+    ups_left = col_left.container(height=860, border=False, key="ups_left_scroll_panel")
+    ups_right = col_right.container(height=860, border=False, key="ups_right_scroll_panel")
+
+    # ── Step 1: Data Import ──────────────────────────────────────────────
+    with ups_left:
+        with st.expander(ups_t("workflow_title"), expanded=False):
+            st.markdown(ups_t("workflow_body"))
+
+        with st.container(border=True):
+            st.subheader("Step 1: Data Import 📁")
+
+            with st.expander("🛠️ Developer / AI Agent Auto-Loader", expanded=False):
+                ups_dev_path = st.text_input(
+                    "Absolute path to UPS .csv file:",
+                    key="ups_dev_path_input",
+                )
+                uc1, uc2 = st.columns(2)
+                with uc1:
+                    if st.button("Auto-Load File", key="ups_btn_autoload", use_container_width=True):
+                        if os.path.exists(ups_dev_path):
+                            st.session_state['ups_dev_autoload_path'] = ups_dev_path
+                        else:
+                            st.error("File not found.")
+                with uc2:
+                    if st.button("Clear loaded file", key="ups_btn_clear_autoload", use_container_width=True):
+                        st.session_state.pop('ups_dev_autoload_path', None)
+
+            ups_dev_file = st.session_state.get('ups_dev_autoload_path', '')
+
+            uploaded_ups = st.file_uploader(
+                "Upload UPS spectrum file",
+                type=['csv'],
+                key='ups_upload_csv',
+                help=ups_t("upload_help"),
+            )
+
+    ups_has_file = (uploaded_ups is not None) or (ups_dev_file and os.path.exists(ups_dev_file))
+
+    if not ups_has_file:
+        with ups_left:
+            st.info(ups_t("upload_required"))
+    else:
+        try:
+            if uploaded_ups is not None:
+                ups_file_content = uploaded_ups.getvalue()
+                ups_filename = uploaded_ups.name
+            else:
+                with open(ups_dev_file, 'rb') as f:
+                    ups_file_content = f.read()
+                ups_filename = os.path.basename(ups_dev_file)
+
+            ups_payload = load_uploaded_ups_file(
+                file_content=ups_file_content,
+                filename=ups_filename,
+            )
+        except Exception as exc:
+            with ups_left:
+                st.error(f"Failed to load UPS file: {exc}")
+        else:
+            ups_data = ups_payload['spectra'][0]
+            ups_energy = ups_data['energy']
+            ups_intensity = ups_data['intensity']
+            ups_trace_name = str(ups_data.get('trace_name', ups_filename))
+
+            with ups_left:
+                st.caption(
+                    f"File: {ups_filename} | Points: {ups_data['n_points']} | "
+                    f"Range: {ups_data['energy_min']:.2f} – {ups_data['energy_max']:.2f} eV"
+                )
+
+            # ── Step 2: Source & Energy Scale ────────────────────────────
+            with ups_left:
+                with st.container(border=True):
+                    st.subheader("Step 2: Photon Source & Scale ☀️")
+
+                    sc1, sc2 = st.columns(2)
+                    with sc1:
+                        source_label = st.selectbox(
+                            "Photon source",
+                            options=list(PHOTON_SOURCES.keys()),
+                            index=0,
+                            key="ups_photon_source",
+                            help="UV photon source energy.",
+                        )
+                    with sc2:
+                        energy_mode = st.selectbox(
+                            "Energy scale",
+                            options=["Binding Energy", "Kinetic Energy"],
+                            index=0,
+                            key="ups_energy_mode",
+                            help="Energy axis convention of your data.",
+                        )
+
+                    if source_label == "Custom":
+                        photon_energy = st.number_input(
+                            "Custom photon energy (eV)",
+                            min_value=1.0, max_value=200.0,
+                            value=21.22, step=0.01,
+                            key="ups_custom_hv",
+                        )
+                    else:
+                        photon_energy = PHOTON_SOURCES[source_label]
+                        st.caption(f"hν = {photon_energy:.2f} eV")
+
+                    energy_mode_key = "binding" if "Binding" in energy_mode else "kinetic"
+
+            # ── Step 3: Edge Regions ─────────────────────────────────────
+            e_min = float(np.min(ups_energy))
+            e_max = float(np.max(ups_energy))
+            e_span = e_max - e_min
+
+            with ups_left:
+                with st.container(border=True):
+                    st.subheader("Step 3: Edge Regions 🔍")
+
+                    st.markdown("**Secondary Electron Cutoff (SEC)**")
+                    if energy_mode_key == "binding":
+                        sec_default_min = e_min
+                        sec_default_max = min(e_min + 0.30 * e_span, e_max)
+                    else:
+                        sec_default_min = e_min
+                        sec_default_max = min(e_min + 0.30 * e_span, e_max)
+
+                    cutoff_range = st.slider(
+                        "SEC region (eV)",
+                        min_value=e_min, max_value=e_max,
+                        value=(sec_default_min, sec_default_max),
+                        step=0.05,
+                        key="ups_cutoff_range",
+                        help="Select the energy region containing the secondary electron cutoff edge.",
+                    )
+
+                    st.markdown("**Valence Band / Fermi Edge**")
+                    if energy_mode_key == "binding":
+                        vb_default_max = e_max
+                        vb_default_min = max(e_max - 0.30 * e_span, e_min)
+                    else:
+                        vb_default_max = e_max
+                        vb_default_min = max(e_max - 0.30 * e_span, e_min)
+
+                    vbm_range = st.slider(
+                        "VBM / Fermi region (eV)",
+                        min_value=e_min, max_value=e_max,
+                        value=(vb_default_min, vb_default_max),
+                        step=0.05,
+                        key="ups_vbm_range",
+                        help="Select the energy region containing the valence band edge or Fermi level.",
+                    )
+
+                    smoothing = st.slider(
+                        "Smoothing window",
+                        5, 51, 11, 2,
+                        key="ups_smooth_window",
+                        help="Savitzky-Golay smoothing for edge detection.",
+                    )
+
+            # ── Step 4: Run Analysis ─────────────────────────────────────
+            with ups_left:
+                with st.container(border=True):
+                    st.subheader("Step 4: Work Function Analysis ⚙️")
+
+                    run_ups = st.button(
+                        "🎯 Calculate Work Function",
+                        type="primary",
+                        use_container_width=True,
+                        key="ups_run_analysis",
+                    )
+
+                    if run_ups:
+                        try:
+                            cutoff_res = detect_secondary_cutoff(
+                                energy=ups_energy,
+                                intensity=ups_intensity,
+                                cutoff_region=tuple(cutoff_range),
+                                smoothing_window=smoothing,
+                            )
+                            vbm_res = detect_valence_band_edge(
+                                energy=ups_energy,
+                                intensity=ups_intensity,
+                                vb_region=tuple(vbm_range),
+                                smoothing_window=smoothing,
+                            )
+                            wf_res = calculate_work_function(
+                                photon_energy=photon_energy,
+                                cutoff_eV=cutoff_res['cutoff_eV'],
+                                vbm_eV=vbm_res['vbm_eV'],
+                                energy_mode=energy_mode_key,
+                            )
+                            st.session_state.ups_cutoff_result = cutoff_res
+                            st.session_state.ups_vbm_result = vbm_res
+                            st.session_state.ups_wf_result = wf_res
+                            st.success(f"Work function: **{wf_res['work_function_eV']:.3f} eV**")
+                        except Exception as exc:
+                            st.session_state.ups_cutoff_result = None
+                            st.session_state.ups_vbm_result = None
+                            st.session_state.ups_wf_result = None
+                            st.error(f"Analysis failed: {exc}")
+
+                    # Show stored results summary
+                    if st.session_state.ups_wf_result is not None:
+                        wfr = st.session_state.ups_wf_result
+                        m1, m2, m3 = st.columns(3)
+                        with m1:
+                            st.metric("Φ (eV)", f"{wfr['work_function_eV']:.3f}")
+                        with m2:
+                            st.metric("Width (eV)", f"{wfr['spectrum_width_eV']:.3f}")
+                        with m3:
+                            st.metric("IP (eV)", f"{wfr['ionization_potential_eV']:.3f}")
+
+                        st.caption(
+                            f"SEC cutoff = {wfr['cutoff_eV']:.3f} eV  |  "
+                            f"VBM = {wfr['vbm_eV']:.3f} eV  |  "
+                            f"hν = {wfr['photon_energy_eV']:.2f} eV"
+                        )
+
+            # ── Visualization (right panel) ──────────────────────────────
+            with ups_right:
+                with st.container():
+                    st.subheader("Spectrum Visualization", divider="gray")
+
+                    with st.expander("👁️ Display Options", expanded=False):
+                        dc1, dc2, dc3 = st.columns(3)
+                        with dc1:
+                            ups_show_cutoff = st.checkbox("SEC cutoff fit", value=True, key="ups_show_cutoff_fit")
+                        with dc2:
+                            ups_show_vbm = st.checkbox("VBM/Fermi fit", value=True, key="ups_show_vbm_fit")
+                        with dc3:
+                            ups_show_annot = st.checkbox("Annotations", value=True, key="ups_show_annotations")
+
+                        s1, s2 = st.columns(2)
+                        with s1:
+                            ups_font_level = st.select_slider(
+                                "Chart text size",
+                                options=["Small", "Medium", "Large", "XL"],
+                                value="Large", key="ups_font_size",
+                            )
+                        with s2:
+                            ups_lw_level = st.select_slider(
+                                "Line weight",
+                                options=["Fine", "Normal", "Bold"],
+                                value="Fine", key="ups_line_weight",
+                            )
+
+                    ups_font_map = {"Small": 12, "Medium": 14, "Large": 16, "XL": 18}
+                    ups_lw_map = {"Fine": 0.8, "Normal": 1.0, "Bold": 1.25}
+                    ups_base_font = ups_font_map[ups_font_level]
+                    ups_line_ws = ups_lw_map[ups_lw_level]
+
+                    fig_ups = create_ups_spectrum_figure(
+                        energy=ups_energy,
+                        intensity=ups_intensity,
+                        cutoff_result=st.session_state.ups_cutoff_result if ups_show_cutoff else None,
+                        vbm_result=st.session_state.ups_vbm_result if ups_show_vbm else None,
+                        wf_result=st.session_state.ups_wf_result if ups_show_annot else None,
+                        title=f"UPS Spectrum: {ups_filename}",
+                        show_cutoff_fit=ups_show_cutoff,
+                        show_vbm_fit=ups_show_vbm,
+                        show_annotations=ups_show_annot,
+                        energy_mode=energy_mode_key,
+                        base_font_size=ups_base_font,
+                        title_font_size=ups_base_font + 8,
+                        figure_height=650,
+                        line_width_scale=ups_line_ws,
+                    )
+                    st.plotly_chart(fig_ups, use_container_width=True)
+
+                # Results table
+                if st.session_state.ups_wf_result is not None:
+                    wfr = st.session_state.ups_wf_result
+                    st.subheader("Analysis Results")
+                    results_df = pd.DataFrame([{
+                        "Parameter": "Work Function (Φ)",
+                        "Value (eV)": f"{wfr['work_function_eV']:.4f}",
+                    }, {
+                        "Parameter": "SEC Cutoff",
+                        "Value (eV)": f"{wfr['cutoff_eV']:.4f}",
+                    }, {
+                        "Parameter": "VBM / Fermi Edge",
+                        "Value (eV)": f"{wfr['vbm_eV']:.4f}",
+                    }, {
+                        "Parameter": "Spectrum Width",
+                        "Value (eV)": f"{wfr['spectrum_width_eV']:.4f}",
+                    }, {
+                        "Parameter": "Ionization Potential",
+                        "Value (eV)": f"{wfr['ionization_potential_eV']:.4f}",
+                    }, {
+                        "Parameter": "Photon Energy (hν)",
+                        "Value (eV)": f"{wfr['photon_energy_eV']:.2f}",
+                    }])
+                    st.dataframe(results_df, use_container_width=True, hide_index=True)
+
+            # ── Step 5: Export ────────────────────────────────────────────
+            with ups_left:
+                with st.container(border=True):
+                    st.subheader("Step 5: Export & Downloads 📥")
+
+                    if st.session_state.ups_wf_result is not None:
+                        wfr = st.session_state.ups_wf_result
+                        csv_data = (
+                            "parameter,value_eV\n"
+                            f"work_function,{wfr['work_function_eV']:.6f}\n"
+                            f"sec_cutoff,{wfr['cutoff_eV']:.6f}\n"
+                            f"vbm_fermi,{wfr['vbm_eV']:.6f}\n"
+                            f"spectrum_width,{wfr['spectrum_width_eV']:.6f}\n"
+                            f"ionization_potential,{wfr['ionization_potential_eV']:.6f}\n"
+                            f"photon_energy,{wfr['photon_energy_eV']:.6f}\n"
+                        ).encode('utf-8')
+                        st.download_button(
+                            label="⬇️ Download Results CSV",
+                            data=csv_data,
+                            file_name=f"{ups_filename.rsplit('.', 1)[0]}_ups_results.csv",
+                            mime="text/csv",
+                            use_container_width=True,
+                            key="ups_download_results",
+                        )
+
+                    ups_export_fmt = st.selectbox("Format", ["PNG", "SVG", "PDF"], key="ups_export_format")
+                    ups_export_preset = st.selectbox(
+                        "Size preset",
+                        ["Presentation (1900x1100)", "Journal Wide (2400x1400)", "Square (1600x1600)"],
+                        key="ups_export_size",
+                    )
+                    ups_export_dpi = st.selectbox("PNG DPI", [150, 300, 600], index=1, key="ups_export_dpi")
+
+                    ups_size_map = {
+                        "Presentation (1900x1100)": (1900, 1100),
+                        "Journal Wide (2400x1400)": (2400, 1400),
+                        "Square (1600x1600)": (1600, 1600),
+                    }
+                    ups_ew, ups_eh = ups_size_map[ups_export_preset]
+
+                    if 'ups_export_bytes' not in st.session_state:
+                        st.session_state.ups_export_bytes = None
+                    if 'ups_export_name' not in st.session_state:
+                        st.session_state.ups_export_name = ""
+
+                    if st.button("🎨 Prepare Export Figure", type="primary", use_container_width=True, key="ups_prepare_export"):
+                        try:
+                            export_fig = create_ups_spectrum_figure(
+                                energy=ups_energy, intensity=ups_intensity,
+                                cutoff_result=st.session_state.ups_cutoff_result,
+                                vbm_result=st.session_state.ups_vbm_result,
+                                wf_result=st.session_state.ups_wf_result,
+                                title=f"UPS: {ups_filename.rsplit('.', 1)[0]}",
+                                show_cutoff_fit=True, show_vbm_fit=True,
+                                show_annotations=True,
+                                energy_mode=energy_mode_key,
+                                base_font_size=16, title_font_size=26,
+                                figure_height=max(700, int(ups_eh * 0.62)),
+                                line_width_scale=ups_line_ws,
+                            )
+                            img_bytes = export_ups_figure_bytes(
+                                fig=export_fig,
+                                export_format=ups_export_fmt.lower(),
+                                width_px=ups_ew, height_px=ups_eh,
+                                dpi=int(ups_export_dpi),
+                            )
+                            export_name = f"{ups_filename.rsplit('.', 1)[0]}_ups_figure.{ups_export_fmt.lower()}"
+                            st.session_state.ups_export_bytes = img_bytes
+                            st.session_state.ups_export_name = export_name
+                            st.success("Export figure prepared.")
+                        except Exception as exc:
+                            st.error(f"Export failed: {exc}")
+
+                    if st.session_state.get('ups_export_bytes'):
+                        mime_map = {"png": "image/png", "svg": "image/svg+xml", "pdf": "application/pdf"}
+                        ext = st.session_state.ups_export_name.split(".")[-1].lower()
+                        st.download_button(
+                            label=f"⬇️ Download {st.session_state.ups_export_name}",
+                            data=st.session_state.ups_export_bytes,
+                            file_name=st.session_state.ups_export_name,
+                            mime=mime_map.get(ext, "application/octet-stream"),
+                            use_container_width=True,
+                            key="ups_download_figure",
+                        )
+
+# ============================================================================
+
+with tab8:
     st.markdown("""
     ## About This Tool
 
@@ -1995,8 +2443,20 @@ with tab7:
     - Salvinelli et al., ACS Appl. Mater. Interfaces **10**, 25941 (2018)
 
     ---
-    **Version**: 2.1.2
-    **Updated**: November 2025
+    ### New Features (v2.2)
+
+    #### 🔮 UPS Spectrum Analyzer
+    - Upload UPS spectrum CSV files for work function analysis
+    - Automatic secondary electron cutoff (SEC) detection via linear extrapolation
+    - Valence band maximum (VBM) / Fermi edge detection
+    - Work function calculation: Φ = hν − spectrum width
+    - Support for He I, He II, Ne I, Ne II, and custom photon sources
+    - Both binding energy and kinetic energy scale support
+    - Interactive visualization with edge fit overlays
+    - Export results (CSV) and publication-quality figures (PNG/SVG/PDF)
+
+    **Version**: 2.2.0
+    **Updated**: March 2026
     **Framework**: Python + Streamlit + Plotly + Matplotlib
     **GitHub**: [2DEG-S-P-toy](https://github.com/aaronderek/2DEG-S-P-toy)
     """)
