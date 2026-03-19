@@ -344,15 +344,15 @@ for comp_curve in st.session_state.comparison_curves:
         })
 
 # Main area - Create tabs
-tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
+tab1, tab2, tab3, tab4, tab6, tab7, tab8, tab5 = st.tabs([
     "📊 Core Figures",
     "📈 Additional Plots",
     "🔬 Experiment Comparison",
     "📤 Publication Export",
-    "🧪 Beta Features",
     "🧲 XPS Spectrum",
     "🔮 UPS Spectrum",
-    "ℹ️ About"
+    "ℹ️ About",
+    "🧪 Beta Features"
 ])
 
 # ============================================================================
