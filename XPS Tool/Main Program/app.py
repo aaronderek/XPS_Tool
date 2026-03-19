@@ -1982,7 +1982,7 @@ with tab7:
 
             uploaded_ups = st.file_uploader(
                 "Upload UPS spectrum file",
-                type=['csv'],
+                type=['csv', 'spe'],
                 key='ups_upload_csv',
                 help=ups_t("upload_help"),
             )
@@ -2010,14 +2010,49 @@ with tab7:
             with ups_left:
                 st.error(f"Failed to load UPS file: {exc}")
         else:
-            ups_data = ups_payload['spectra'][0]
+            all_ups_spectra = ups_payload['spectra']
+            ups_file_type = ups_payload['file_type']
+
+            with ups_left:
+                if ups_file_type == 'spe':
+                    st.success(
+                        f"SPE converted successfully: {len(all_ups_spectra)} trace(s) "
+                        f"via {ups_payload.get('method', 'auto')}."
+                    )
+
+                    log_text = (ups_payload.get('logs') or '').strip()
+                    if ups_payload.get('method') == "local_phi_parser":
+                        st.info("Data was extracted using the built-in PHI parser fallback. "
+                                "Results should be correct, but verify against known references.")
+                    if log_text:
+                        with st.expander("Conversion Log", expanded=False):
+                            st.code(log_text)
+
+                    if len(all_ups_spectra) > 1:
+                        ups_trace_labels = [
+                            f"{idx + 1}. {spec.get('trace_name', f'trace_{idx + 1}')}"
+                            for idx, spec in enumerate(all_ups_spectra)
+                        ]
+                        selected_ups_trace_label = st.selectbox(
+                            "Select trace from converted SPE",
+                            options=ups_trace_labels,
+                            key='ups_trace_select',
+                            help="Choose which trace (element region) to analyse.",
+                        )
+                        ups_selected_idx = ups_trace_labels.index(selected_ups_trace_label)
+                    else:
+                        ups_selected_idx = 0
+                else:
+                    ups_selected_idx = 0
+
+            ups_data = all_ups_spectra[ups_selected_idx]
             ups_energy = ups_data['energy']
             ups_intensity = ups_data['intensity']
             ups_trace_name = str(ups_data.get('trace_name', ups_filename))
 
             with ups_left:
                 st.caption(
-                    f"File: {ups_filename} | Points: {ups_data['n_points']} | "
+                    f"File: {ups_filename} | Trace: {ups_trace_name} | Points: {ups_data['n_points']} | "
                     f"Range: {ups_data['energy_min']:.2f} – {ups_data['energy_max']:.2f} eV"
                 )
 
