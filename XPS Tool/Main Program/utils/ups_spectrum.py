@@ -128,19 +128,40 @@ def _spectrum_from_dataframe(df: pd.DataFrame, filename: str = "") -> Dict[str, 
 
 
 def load_uploaded_ups_file(file_content: bytes, filename: str) -> Dict[str, Any]:
-    """Load a UPS CSV file into the standard payload format."""
+    """Load a UPS spectrum file (.csv or .spe) into the standard payload format."""
     lower = (filename or "").lower()
-    if not lower.endswith(".csv"):
-        raise ValueError("UPS panel currently supports .csv files only.")
 
-    spec = load_ups_spectrum_data(file_content, filename=filename)
-    spec["trace_name"] = filename.rsplit(".", 1)[0] if "." in filename else filename
-    return {
-        "file_type": "csv",
-        "spectra": [spec],
-        "logs": "Loaded UPS CSV spectrum.",
-        "method": "csv",
-    }
+    if lower.endswith(".csv"):
+        spec = load_ups_spectrum_data(file_content, filename=filename)
+        spec["trace_name"] = filename.rsplit(".", 1)[0] if "." in filename else filename
+        return {
+            "file_type": "csv",
+            "spectra": [spec],
+            "logs": "Loaded UPS CSV spectrum.",
+            "method": "csv",
+        }
+
+    if lower.endswith(".spe"):
+        from utils.xps_spectrum import extract_spe_traces
+
+        spe_result = extract_spe_traces(file_content=file_content, filename=filename)
+        ups_spectra = []
+        for spec in spe_result["spectra"]:
+            df = pd.DataFrame({
+                spec.get("energy_col", "E"): spec["energy"],
+                spec.get("intensity_col", "y"): spec["intensity"],
+            })
+            ups_spec = _spectrum_from_dataframe(df, filename=filename)
+            ups_spec["trace_name"] = spec.get("trace_name", "unknown")
+            ups_spectra.append(ups_spec)
+        return {
+            "file_type": "spe",
+            "spectra": ups_spectra,
+            "logs": spe_result.get("logs", ""),
+            "method": spe_result.get("method", "spe"),
+        }
+
+    raise ValueError("UPS panel supports .csv and .spe files only.")
 
 
 # ── Edge detection via linear extrapolation ──────────────────────────────
